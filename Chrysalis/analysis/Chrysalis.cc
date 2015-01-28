@@ -338,7 +338,7 @@ int main(int argc,char** argv)
     string outDir = P.GetStringValueFor(oStringCmmd);
     string butterflyExec = P.GetStringValueFor(butterflyCmmd);
     string sortBufferSizeString = P.GetStringValueFor(sortBufferSizeCmmd);
-    
+    string samtoolsSortBufferSizeString = P.GetStringValueFor(samtoolsSortBufferSizeCmmd);
 
     bool PAIRED_READS_MODE = P.GetBoolValueFor(pairsStringCmmd);
     bool bSkip = P.GetBoolValueFor(skipCmmd);
