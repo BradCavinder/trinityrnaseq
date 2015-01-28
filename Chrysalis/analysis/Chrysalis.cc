@@ -277,6 +277,7 @@ int main(int argc,char** argv)
     commandArg<double> minIsoRatioCmmd("-min_iso_ratio", "min ratio of (iworm pair coverage) for join", 0.05);
     commandArg<bool> debugCmmd("-debug", "verbosely describes operations", false);
     commandArg<string> sortBufferSizeCmmd("-sort_buffer_size","size of memory buffer to use in all sort calls", "2G");
+    commandArg<string> samtoolsSortBufferSizeCmmd("-samtools_sort_buffer_size","size of memory buffer to use in samtools sort calls", "4G");
     commandArg<bool> no_cleanupCmmd ("-no_cleanup", "retain input files on success", false);
     commandArg<string> readsForPairsCmmd("-reads_for_pairs", "reads fasta file to use for pairing analysis", "");
     commandArg<bool> noPairLinksCmmd("-no_pair_links", "ignore pair link info in clustering", false);
@@ -310,6 +311,7 @@ int main(int argc,char** argv)
     P.registerArg(minIsoRatioCmmd);
     P.registerArg(debugCmmd);
     P.registerArg(sortBufferSizeCmmd);
+    P.registerArg(samtoolsSortBufferSizeCmmd);
     P.registerArg(no_cleanupCmmd);
     P.registerArg(readsForPairsCmmd);
     P.registerArg(noPairLinksCmmd);
@@ -344,6 +346,17 @@ int main(int argc,char** argv)
     int minDumpLen = P.GetIntValueFor(minDumpLenCmmd);
     int minLen = P.GetIntValueFor(minCmmd);
     int nCPU = P.GetIntValueFor(cpuCmmd);
+    int nCPU2 = nCPU/2;
+    int nCPU3 = nCPU2-1;
+    if (nCPU2*2 < nCPU) {
+        nCPU3 = nCPU2;
+    }
+    if (nCPU2 < 1) {
+        nCPU2 = 1;
+    }
+    if (nCPU3 < 1) {
+        nCPU3 = 1;
+    }
     int pairDist = P.GetIntValueFor(distCmmd);
     bool NO_PAIR_LINKS = P.GetBoolValueFor(noPairLinksCmmd);
     bool BOWTIE_COMP = P.GetBoolValueFor(bowtieCompCmmd);
@@ -428,10 +441,12 @@ int main(int argc,char** argv)
             if (Exists(bowtie_checkpoint)){
                 cerr << "Warning, bowtie output already exists and will be re-used: " << bowtie_sam_file << endl;
             }else{
-                 cmdstr << "bash -c \" set -o pipefail; bowtie -a -m 20 --best --strata --threads " << nCPU 
-                        << " --chunkmbs 512 -q -S "
+                 cmdstr << "bash -c \" set -o pipefail; bowtie -a -m 20 --best --strata --threads " << nCPU2 
+                        << " --chunkmbs 1024 -q -S "
                         << " -f target " << readsForPairs 
-                        << " | samtools view -F4 -Sb - | samtools sort -no - - > " << bowtie_sam_file << " \" ";
+                        << " | samtools view -F4 -Sb - | samtools sort -m " << samtoolsSortBufferSizeString 
+                        << " -@ " << nCPU3 
+                        << " -no - - > " << bowtie_sam_file << " \" ";
                  
                  cerr << "CMD: " << cmdstr.str() << endl;
                  Execute(cmdstr.str().c_str());
