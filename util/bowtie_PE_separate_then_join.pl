@@ -48,6 +48,7 @@ my $usage = <<_EOUSAGE_;
 #  --retain_intermediate_files     retain all the intermediate sam files produced (they take up lots of space! and there's lots of them)
 #  --prep_rsem                     prep the rsem-ready files
 #  --run_rsem                      execute rsem (implies --prep_rsem)
+#  --samtools_sort_memory          per processor memory to be used with samtools sort (default: 8G)
 #        --trinity_mode       extract gene/trans mapping info from Trinity.fasta file directly
 #        --gene_trans_map <string>    rsem gene-to-transcript mapping file to use.
 #
@@ -93,6 +94,7 @@ my $aligner;
 my $retain_intermediate_files_flag = 0;
 my $PREP_RSEM = 0;
 my $RUN_RSEM = 0;
+my $samtools_sort_memory = "8G";
 
 my $trinity_mode;
 my $gene_trans_map_file;
@@ -130,6 +132,7 @@ unless (@ARGV) {
               
               'prep_rsem' => \$PREP_RSEM,
               'run_rsem' => \$RUN_RSEM,
+              'samtools_sort_memory' => \$samtools_sort_memory,
               'trinity_mode' => \$trinity_mode,
               'gene_trans_map=s' =>\$gene_trans_map_file,
               
@@ -217,15 +220,27 @@ unless ($aligner eq "bowtie") {
 my $util_dir = "$FindBin::Bin/../util/support_scripts";
 
 my ($start_dir, $work_dir, $num_hits);
-
+my $PROCS;
+my $check_opts = join(" ", @ARGV);
+print "Check opts: $check_opts\n";
+if ($check_opts =~ /-p ([0-9]+)/) {
+    $PROCS = $1;
+    print "Found match for processors: $PROCS\n";
+}
+else {
+    print "Defaulting to 1 processors\n";
+    $PROCS = 1;
+}
+my $PROCS2 = $PROCS*2;
+print "Procs2:  $PROCS2\n";
 
 main: {
     $start_dir = cwd();
-
+    
     $left_file = &build_full_paths($left_file, $start_dir) if $left_file;
     $right_file = &build_full_paths($right_file, $start_dir) if $right_file;
     $target_db = &build_full_paths($target_db, $start_dir);
-    
+
     $single_file = &build_full_paths($single_file, $start_dir) if $single_file;
     
     
@@ -452,7 +467,7 @@ main: {
         push (@to_delete, "combined.nameSorted.pre.bam");
         
         ## sort by coordinate.
-        $cmd = "samtools sort -o combined.nameSorted.pre.bam - > $outfile_basename.coordSorted.pre.bam";
+        $cmd = "samtools sort -m $samtools_sort_memory -@ $PROCS2 -o combined.nameSorted.pre.bam - > $outfile_basename.coordSorted.pre.bam";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.pre.bam.finished");
         $cmd = "touch $outfile_basename.coordSorted.pre.bam.finished";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.pre.bam.finished");
@@ -460,7 +475,7 @@ main: {
     }
     else {
         ## single file
-        my $cmd = "samtools sort -o single/single.nameSorted.bam - > $outfile_basename.coordSorted.pre.bam";
+        my $cmd = "samtools sort -m $samtools_sort_memory -@ $PROCS2 -o single/single.nameSorted.bam - > $outfile_basename.coordSorted.pre.bam";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.pre.bam.finished");
         $cmd = "touch $outfile_basename.coordSorted.pre.bam.finished";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.pre.bam.finished");
@@ -469,7 +484,7 @@ main: {
     
     # add transcribed orientation info:
     if ($SS_lib_type) {
-        my $cmd = "$util_dir/SAM_set_transcribed_orient_info.pl $outfile_basename.coordSorted.pre.bam $SS_lib_type | samtools view -bt target.fa.fai -S -o - - | samtools sort -o - - >  $outfile_basename.coordSorted.bam";
+        my $cmd = "$util_dir/SAM_set_transcribed_orient_info.pl $outfile_basename.coordSorted.pre.bam $SS_lib_type | samtools view -bt target.fa.fai -S -o - - | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - >  $outfile_basename.coordSorted.bam";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.bam.finished");
         $cmd = "touch $outfile_basename.coordSorted.bam.finished";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.bam.finished");
@@ -477,7 +492,7 @@ main: {
     }
     else {
         # not strand-specific, keep as is and don't disrupt current flow (so use expected output name)
-        my $cmd = "samtools sort -o $outfile_basename.coordSorted.pre.bam - > $outfile_basename.coordSorted.bam";
+        my $cmd = "samtools sort -m $samtools_sort_memory -@ $PROCS2 -o $outfile_basename.coordSorted.pre.bam - > $outfile_basename.coordSorted.bam";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.bam.finished");
         
         $cmd = "touch $outfile_basename.coordSorted.bam.finished";
@@ -492,7 +507,7 @@ main: {
     @to_delete = (); # reinit        
     
     ## provide name-sorted SAM
-    my $cmd = "samtools sort -no $outfile_basename.coordSorted.bam - > $outfile_basename.nameSorted.bam";
+    my $cmd = "samtools sort -m $samtools_sort_memory -@ $PROCS2 -no $outfile_basename.coordSorted.bam - > $outfile_basename.nameSorted.bam";
     &process_cmd($cmd) unless (-e "$outfile_basename.nameSorted.bam.finished");
     $cmd = "touch $outfile_basename.nameSorted.bam.finished";
     &process_cmd($cmd) unless (-e "$outfile_basename.nameSorted.bam.finished");
@@ -547,7 +562,7 @@ main: {
             push (@to_delete, $sam_file);
         
             $cmd = ($bam_file =~ /coordSorted/) 
-                ? "samtools view -bt target.fa.fai $sam_file | samtools sort -o - - > $bam_file" # .bam ext added auto
+                ? "samtools view -bt target.fa.fai $sam_file | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - > $bam_file" # .bam ext added auto
                 : "samtools view -bt target.fa.fai $sam_file > $bam_file"; # explicitly adding .bam extension
             
             
@@ -745,7 +760,7 @@ sub run_bowtie_alignment_pipeline {
     }
     
     # name-sort 
-    $cmd = "samtools sort -no $target.bam - > $target.nameSorted.bam";
+    $cmd = "samtools sort -m $samtools_sort_memory -@ $PROCS -no $target.bam - > $target.nameSorted.bam";
     &process_cmd($cmd) unless (-e "$target.nameSorted.bam.finished");
     $cmd = "touch $target.nameSorted.bam.finished";
     &process_cmd($cmd) unless (-e "$target.nameSorted.bam.finished");
