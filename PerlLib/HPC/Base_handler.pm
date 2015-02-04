@@ -1,4 +1,4 @@
-package HTC::Base_handler;
+package HPC::Base_handler;
 
 use strict;
 use warnings;

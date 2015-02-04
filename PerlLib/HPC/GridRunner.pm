@@ -1,4 +1,4 @@
-package HTC::GridRunner;
+package HPC::GridRunner;
 
 use strict;
 use warnings;
@@ -7,16 +7,13 @@ use List::Util qw (shuffle);
 use FindBin;
 use Cwd;
 
-use HTC::FarmIt;
-use HTC::LSF_handler;
-use HTC::SGE_handler;
-use HTC::SLURM_handler;
-use HTC::PBS_handler;
+use HPC::FarmIt;
+use HPC::LSF_handler;
+use HPC::SGE_handler;
+use HPC::SLURM_handler;
+use HPC::PBS_handler;
 
 BEGIN {
-    unless ($ENV{TRINITY_HOME}) {
-        confess "ERROR, must have env var TRINITY_HOME set to the base installation directory of Trinity ";
-    }
 
     unless ($ENV{HOSTNAME}) {
         if ($ENV{HOST}) {
@@ -28,6 +25,25 @@ BEGIN {
     }
     
 }
+
+my $PARAFLY_PROG;
+
+## static method:
+sub use_parafly {
+    my $parafly_prog = `which ParaFly`;
+    unless ($parafly_prog =~ /\w/) {
+        confess "Error, cannot find ParaFly.  Please be sure that ParaFly is installed in yuor PATH env setting. ";
+    }
+    chomp $parafly_prog;
+    
+    $PARAFLY_PROG = $parafly_prog;
+    
+    print STDERR "* Found ParaFly installed at: $parafly_prog\n\n";
+    
+    return;
+}
+    
+
 
 ####
 sub new {
@@ -61,16 +77,16 @@ sub new {
     
     my $handler;
     if ($grid_type eq "LSF") {
-        $handler = HTC::LSF_handler->new(\%config);
+        $handler = HPC::LSF_handler->new(\%config);
     }
     elsif ($grid_type eq "SGE") {
-        $handler = HTC::SGE_handler->new(\%config);
+        $handler = HPC::SGE_handler->new(\%config);
     }
     elsif ($grid_type eq "SLURM") {
-        $handler = HTC::SLURM_handler->new(\%config);
+        $handler = HPC::SLURM_handler->new(\%config);
     }
     elsif ($grid_type eq "PBS") {
-        $handler = HTC::PBS_handler->new(\%config);
+        $handler = HPC::PBS_handler->new(\%config);
     }
     else {
         confess "Error, grid type: $grid_type is not supported";
@@ -148,7 +164,7 @@ sub run_on_grid {
         $params{cmds_per_node} = $cmds_per_node;
     }
 
-    my $farmer = new HTC::FarmIt(\%params);
+    my $farmer = new HPC::FarmIt(\%params);
     
     $farmer->submit_jobs();
     
@@ -165,13 +181,23 @@ sub run_on_grid {
         }
 
         print STDERR "$num_failed_cmds commands failed during grid computing.\n";
-        print STDERR "Failed cmds:\n" . join("\n", @cmds_remaining) . "\n";
+                
+        my $cache_failed_cmds = "$cache_completed_cmds_file.__failures";
+        print STDERR "-failed commands written to: $cache_failed_cmds\n\n";
+        open (my $ofh, ">$cache_failed_cmds") or die "Error, cannot write to $cache_failed_cmds";
+        foreach my $cmd (@cmds_remaining) {
+            print $ofh "$cmd\n";
+        }
+        close $ofh;
         
-
-        ## try running them via parafly
-        print STDERR "\n\nTrying to run them using parafly...\n\n";
-        return($self->run_parafly(@cmds_remaining));
-        
+        if ($PARAFLY_PROG) {
+            ## try running them via parafly
+            print STDERR "\n\nTrying to run them using parafly...\n\n";
+            return($self->run_parafly($cache_failed_cmds));
+        }
+        else {
+            return(1);
+        }
     }
     else {
         print "All commands completed successfully on the computing grid.\n";
@@ -182,32 +208,21 @@ sub run_on_grid {
 ####
 sub run_parafly {
     my $self = shift;
-    my (@cmds) = @_;
+    my ($cmds_file_for_parafly) = @_;
 
     my $cache_file = $self->{cache_completed_cmds_file};
+    
+    my $num_cpus = $ENV{OMP_NUM_THREADS} || 1;
 
-    my $cmds_file = "$cache_file.failed_for_parafly.txt";
-    open (my $ofh, ">$cmds_file") or die "Error, cannot write to file $cmds_file";
-    foreach my $cmd (@cmds) {
-        print $ofh $cmd . "\n";
-    }
-
-    my $num_cpus = $ENV{OMP_NUM_THREADS} || 10;
-
-    my $cmd;
-    if (my $trin_home = $ENV{TRINITY_HOME}) {
-        $cmd = "$trin_home/trinity-plugins/parafly/bin/ParaFly";
-    }
-    else {
-        $cmd = "ParaFly";
-    }
-
-    $cmd .= " -c $cmds_file -CPU $num_cpus -v -shuffle -failed_cmds $cmds_file.FAILED_DURING_PARAFLY";
+    my $cmd = "$PARAFLY_PROG -c $cmds_file_for_parafly -CPU $num_cpus -v -shuffle -failed_cmds $cmds_file_for_parafly.FAILED_DURING_PARAFLY";
     
     my $ret = system($cmd);
 
     if ($ret) {
-        die "Error, cmd: $cmd died with ret: $ret";
+        die "\n\nError, cmd: $cmd died with ret: $ret.\n\n"
+            . "###########\n"
+            . "## See $cmds_file_for_parafly.FAILED_DURING_PARAFLY for final set of commands that could not be executed successfully.\n"
+            . "###########\n\n\n";
     }
     
     return(0);

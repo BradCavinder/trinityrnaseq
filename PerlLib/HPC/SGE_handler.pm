@@ -1,8 +1,8 @@
-package HTC::LSF_handler;
+package HPC::SGE_handler;
 
 use strict;
 use warnings;
-use base qw(HTC::Base_handler);
+use base qw(HPC::Base_handler);
 use Carp;
 use Cwd;
 
@@ -14,7 +14,8 @@ sub new {
     unless (ref $config_href) {
         confess "Error, need config href as param";
     }
-        
+    
+    
     my $self = {config => $config_href};
     
     bless($self, $packagename);
@@ -33,25 +34,19 @@ sub submit_job_to_grid {
 
     ## submit the command, do any additional job administration as required, such as capturing job ID
 
-    my $cmd = $self->{config}->{cmd} or confess "Error, need grid cmd template from config";
+    my $cmd = $self->{config}->{cmd} or confess "Error, need cmd from config file";
     
-    $cmd .= " -e $shell_script.stderr -o $shell_script.stdout ";
-        
-    if (my $mount_test = $self->{config}->{mount_test}) {
-        #$cmd .= " -E \"/broad/tools/NoArch/pkgs/local/checkmount $mount_test && [ -e $mount_test ]\" ";
-        my $workdir = cwd();
-        $cmd .= " -E  \"[ -e $workdir ]\"";
-    }
-                
     $cmd .= " $shell_script 2>&1 ";
-    
+        
+
     my $job_id_text = `$cmd`;
-    # print STDERR "\n$job_id_text\n";
+    #print STDERR "\nSGE: $job_id_text\n";
     
     my $ret = $?;
     
+
     if ($ret) {
-        print STDERR "FARMIT failed to accept job: $cmd\n (ret $ret)\n$job_id_text";
+        print STDERR "FARMIT failed to accept job: $cmd\n (ret $ret)\n$job_id_text\n";
         return(-1);
     }
     else {
@@ -59,7 +54,7 @@ sub submit_job_to_grid {
         ## job submitted just fine.
         
         ## get the job ID and log it:
-        if ($job_id_text =~ /Job \<(\d+)\>/) {
+        if ($job_id_text =~ /Your job (\d+) /) {
             my $job_id = $1;
             return($job_id);
         }
@@ -82,21 +77,18 @@ sub job_running_or_pending_on_grid {
     
     # print STDERR "Polling grid to check status of job: $job_id\n";
     
-    my $response = `bjobs $job_id`;
+    my $response = `qstat`;
     #print STDERR "Response:\n$response\n";
 
     foreach my $line (split(/\n/, $response)) {
         my @x = split(/\s+/, $line);
 
         if ($x[0] eq $job_id) {
-            my $state = $x[2];
-            if ($state eq "DONE" || $state eq "EXIT") {
-                return(0);
-            }
-            else {
-                $self->{job_id_to_submission_time}->{$job_id} = time();
-                return($state);
-            }
+            my $state = $x[4];
+            
+            $self->{job_id_to_submission_time}->{$job_id} = time();
+            return($state);
+            
         }
     }
     

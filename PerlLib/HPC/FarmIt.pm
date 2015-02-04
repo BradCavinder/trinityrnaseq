@@ -3,7 +3,7 @@
 package main;
 our $SEE;
 
-package HTC::FarmIt;
+package HPC::FarmIt;
 
 use strict;
 use warnings;
@@ -38,7 +38,7 @@ use List::Util qw (shuffle);
 
    
 my $farmer = new Farmit({cmds=>\@cmds,
-                         handler => HTC::LSF->new(...), or HTC::SGE->new(...)
+                         handler => HPC::LSF->new(...), or HPC::SGE->new(...)
 
                              # optional, have defaults:
                              log_base_dir => cwd(),
