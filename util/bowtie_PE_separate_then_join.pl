@@ -48,7 +48,7 @@ my $usage = <<_EOUSAGE_;
 #  --retain_intermediate_files     retain all the intermediate sam files produced (they take up lots of space! and there's lots of them)
 #  --prep_rsem                     prep the rsem-ready files
 #  --run_rsem                      execute rsem (implies --prep_rsem)
-#  --samtools_sort_memory          per processor memory to be used with samtools sort (default: 8G)
+#  --samtools_sort_memory          per processor memory to be used with samtools sort (default: 4G)
 #        --trinity_mode       extract gene/trans mapping info from Trinity.fasta file directly
 #        --gene_trans_map <string>    rsem gene-to-transcript mapping file to use.
 #
@@ -94,7 +94,7 @@ my $aligner;
 my $retain_intermediate_files_flag = 0;
 my $PREP_RSEM = 0;
 my $RUN_RSEM = 0;
-my $samtools_sort_memory = "8G";
+my $samtools_sort_memory = "4G";
 
 my $trinity_mode;
 my $gene_trans_map_file;
@@ -221,18 +221,21 @@ my $util_dir = "$FindBin::Bin/../util/support_scripts";
 
 my ($start_dir, $work_dir, $num_hits);
 my $PROCS;
+my $PROCS2;
 my $check_opts = join(" ", @ARGV);
 print "Check opts: $check_opts\n";
 if ($check_opts =~ /-p ([0-9]+)/) {
-    $PROCS = $1;
+    $PROCS2 = $1;
     print "Found match for processors: $PROCS\n";
 }
 else {
     print "Defaulting to 1 processors\n";
+    $PROCS2 = 1;
+}
+$PROCS = int($PROCS2/2);
+if ($PROCS == 0) {
     $PROCS = 1;
 }
-my $PROCS2 = $PROCS*2;
-print "Procs2:  $PROCS2\n";
 
 main: {
     $start_dir = cwd();

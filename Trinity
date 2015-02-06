@@ -109,6 +109,8 @@ my $inchworm_cpu = 6;
 my $min_percent_read_iworm_kmers = -1; # experimental, off
 
 my $CPU = 2;
+my $CPU2;
+my $CPU3;
 my $np = 1;
 my $mpiexec = "mpiexec";
 my $bflyCPU;
@@ -920,7 +922,14 @@ my $PARALLEL_SAMTOOLS_SORT_TOKEN = "";
 {
     my $samtools_version_info = `samtools 2>&1`;
     if ($samtools_version_info =~ /Version: 1.1/) {
-	$PARALLEL_SAMTOOLS_SORT_TOKEN = "-\@ $CPU";
+        $CPU2 = int($CPU/2);
+        if ($CPU2*2 == $CPU) {
+            $CPU3 = $CPU2-1;
+        }
+        else {
+            $CPU3 = $CPU2;
+        }
+        $PARALLEL_SAMTOOLS_SORT_TOKEN = "-\@ $CPU3";
     }
 }
 
@@ -1437,7 +1446,7 @@ sub run_chrysalis {
             $pipeliner->add_commands( new Command($cmd, "$iworm_min100_fa_file.bowtie_build.ok"));
 
             my $bowtie_sam_file = "$chrysalis_output_dir/iworm.bowtie.nameSorted.bam";
-            $cmd = "bash -c \" set -o pipefail; bowtie -a -m 20 --best --strata --threads $CPU  --chunkmbs 512 -q -S -f $iworm_min100_fa_file $bowtie_reads_fa  | samtools view -F4 -Sb - | samtools sort $PARALLEL_SAMTOOLS_SORT_TOKEN -no - - > $bowtie_sam_file\" ";
+            $cmd = "bash -c \" set -o pipefail; bowtie -a -m 20 --best --strata --threads $CPU2  --chunkmbs 512 -q -S -f $iworm_min100_fa_file $bowtie_reads_fa  | samtools view -F4 -Sb - | samtools sort $PARALLEL_SAMTOOLS_SORT_TOKEN -no - - > $bowtie_sam_file\" ";
             
             unless ($SEE) {
                 $cmd .= " 2>/dev/null";
