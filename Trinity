@@ -916,19 +916,18 @@ elsif ($CUFFFLY_MODE) {
     $butterfly_output_filename = "Trinity.Cufffly.fasta";
 }
 
-
+$CPU2 = int($CPU/2);
+if ($CPU2*2 == $CPU) {
+    $CPU3 = $CPU2-1;
+}
+else {
+    $CPU3 = $CPU2;
+}
 
 my $PARALLEL_SAMTOOLS_SORT_TOKEN = "";
 {
     my $samtools_version_info = `samtools 2>&1`;
     if ($samtools_version_info =~ /Version: 1.1/) {
-        $CPU2 = int($CPU/2);
-        if ($CPU2*2 == $CPU) {
-            $CPU3 = $CPU2-1;
-        }
-        else {
-            $CPU3 = $CPU2;
-        }
         $PARALLEL_SAMTOOLS_SORT_TOKEN = "-\@ $CPU3";
     }
 }
