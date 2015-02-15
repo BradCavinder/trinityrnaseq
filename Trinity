@@ -1324,7 +1324,7 @@ sub run_Trinity {
     
     
     
-    if ($jaccard_clip && $TRINITY_COMPLETE_FLAG) {
+    if ($jaccard_clip && ! $TRINITY_COMPLETE_FLAG) {
         
         if ($jaccard_clip && -s 'left.fa' && -s 'right.fa') {
             $inchworm_file = &run_jaccard_clip_left_right($inchworm_file, \@left_files, \@right_files, $seqType, $SS_lib_type);
