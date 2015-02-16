@@ -226,7 +226,7 @@ my $check_opts = join(" ", @ARGV);
 print "Check opts: $check_opts\n";
 if ($check_opts =~ /-p ([0-9]+)/) {
     $PROCS2 = $1;
-    print "Found match for processors: $PROCS\n";
+    print "Found match for processors: $PROCS2\n";
 }
 else {
     print "Defaulting to 1 processors\n";
@@ -462,7 +462,7 @@ main: {
     if ($left_file && $right_file) {
         ## Now, capture just the top number of hits taking into account read pairing info.
         
-        my $cmd = "$util_dir/merge_left_right_nameSorted_SAMs.pl --left_sam left/left.nameSorted.bam --right_sam right/right.nameSorted.bam -D $max_dist_between_pairs | samtools view -bt target.fa.fai -S - > combined.nameSorted.pre.bam";
+        my $cmd = "$util_dir/merge_left_right_nameSorted_SAMs.pl --left_sam left/left.nameSorted.bam --right_sam right/right.nameSorted.bam -D $max_dist_between_pairs | samtools view -@ $PROCS2 -bt target.fa.fai -S - > combined.nameSorted.pre.bam";
         &process_cmd($cmd) unless (-e "combined.nameSorted.pre.bam.finished");
         $cmd = "touch combined.nameSorted.pre.bam.finished";
         &process_cmd($cmd) unless (-e "combined.nameSorted.pre.bam.finished");
@@ -487,7 +487,7 @@ main: {
     
     # add transcribed orientation info:
     if ($SS_lib_type) {
-        my $cmd = "$util_dir/SAM_set_transcribed_orient_info.pl $outfile_basename.coordSorted.pre.bam $SS_lib_type | samtools view -bt target.fa.fai -S -o - - | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - >  $outfile_basename.coordSorted.bam";
+        my $cmd = "$util_dir/SAM_set_transcribed_orient_info.pl $outfile_basename.coordSorted.pre.bam $SS_lib_type | samtools view -@ $PROCS2 -bt target.fa.fai -S -o - - | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - >  $outfile_basename.coordSorted.bam";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.bam.finished");
         $cmd = "touch $outfile_basename.coordSorted.bam.finished";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.bam.finished");
@@ -516,7 +516,7 @@ main: {
     &process_cmd($cmd) unless (-e "$outfile_basename.nameSorted.bam.finished");
         
     
-    $cmd = "samtools view -bt target.fa.fai $outfile_basename.nameSorted.sam > $outfile_basename.nameSorted.bam";
+    $cmd = "samtools view -@ $PROCS2 -bt target.fa.fai $outfile_basename.nameSorted.sam > $outfile_basename.nameSorted.bam";
     &process_cmd($cmd) if  ( (! -e "$outfile_basename.nameSorted.bam") && -s "$outfile_basename.nameSorted.sam");
     
     
@@ -565,8 +565,8 @@ main: {
             push (@to_delete, $sam_file);
         
             $cmd = ($bam_file =~ /coordSorted/) 
-                ? "samtools view -bt target.fa.fai $sam_file | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - > $bam_file" # .bam ext added auto
-                : "samtools view -bt target.fa.fai $sam_file > $bam_file"; # explicitly adding .bam extension
+                ? "samtools view -@ -@ $PROCS -bt target.fa.fai $sam_file | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - > $bam_file" # .bam ext added auto
+                : "samtools view -@ $PROCS2 -bt target.fa.fai $sam_file > $bam_file"; # explicitly adding .bam extension
             
             
             &process_cmd($cmd) unless (-e "$bam_file.finished");
@@ -601,7 +601,7 @@ main: {
             my $rsem_pre_bam;
             if ($left_file && $right_file) {
                 $rsem_pre_bam = "$bam_file.PropMapPairsForRSEM.pre.bam";
-                $cmd = "$util_dir/SAM_extract_properly_mapped_pairs.pl $bam_file | samtools view -bt target.fa.fai -S - > $rsem_pre_bam";
+                $cmd = "$util_dir/SAM_extract_properly_mapped_pairs.pl $bam_file | samtools view -@ $PROCS2 -bt target.fa.fai -S - > $rsem_pre_bam";
                 &process_cmd($cmd) unless (-e "$rsem_pre_bam.finished");
                 $cmd = "touch $rsem_pre_bam.finished";
                 &process_cmd($cmd) unless (-e "$rsem_pre_bam.finished");
@@ -746,7 +746,7 @@ sub run_bowtie_alignment_pipeline {
     
     $trans_fa_name = join(",", @adj_files);
     
-    my $cmd = "bash -c \"$aligner @bowtie_opts --chunkmbs 512 -S $format target $trans_fa_name | samtools view -S -b -o $target.pre.bam - \"";
+    my $cmd = "bash -c \"$aligner @bowtie_opts --chunkmbs 512 -S $format target $trans_fa_name | samtools view -@ $PROCS -S -b -o $target.pre.bam - \"";
 
     &process_cmd($cmd) unless (-e "$target.pre.bam.finished");
     $cmd = "touch $target.pre.bam.finished";
@@ -754,7 +754,7 @@ sub run_bowtie_alignment_pipeline {
         
     
     ## remove unaligned reads
-    $cmd = "samtools view -F 4 -b $target.pre.bam > $target.bam";
+    $cmd = "samtools view -@ $PROCS -F 4 -b $target.pre.bam > $target.bam";
     &process_cmd($cmd) unless (-e "$target.bam.finished");
     $cmd = "touch $target.bam.finished";
     &process_cmd($cmd) unless (-e "$target.bam.finished");
