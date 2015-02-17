@@ -487,7 +487,7 @@ main: {
     
     # add transcribed orientation info:
     if ($SS_lib_type) {
-        my $cmd = "$util_dir/SAM_set_transcribed_orient_info.pl $outfile_basename.coordSorted.pre.bam $SS_lib_type | samtools view -@ $PROCS2 -bt target.fa.fai -S -o - - | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - >  $outfile_basename.coordSorted.bam";
+        my $cmd = "$util_dir/SAM_set_transcribed_orient_info.pl $outfile_basename.coordSorted.pre.bam $SS_lib_type | samtools view -@ $PROCS -bt target.fa.fai -S -o - - | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - >  $outfile_basename.coordSorted.bam";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.bam.finished");
         $cmd = "touch $outfile_basename.coordSorted.bam.finished";
         &process_cmd($cmd) unless (-e "$outfile_basename.coordSorted.bam.finished");
@@ -754,7 +754,7 @@ sub run_bowtie_alignment_pipeline {
         
     
     ## remove unaligned reads
-    $cmd = "samtools view -@ $PROCS -F 4 -b $target.pre.bam > $target.bam";
+    $cmd = "samtools view -@ $PROCS2 -F 4 -b $target.pre.bam > $target.bam";
     &process_cmd($cmd) unless (-e "$target.bam.finished");
     $cmd = "touch $target.bam.finished";
     &process_cmd($cmd) unless (-e "$target.bam.finished");
