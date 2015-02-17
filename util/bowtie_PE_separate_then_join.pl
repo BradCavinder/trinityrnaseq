@@ -565,7 +565,7 @@ main: {
             push (@to_delete, $sam_file);
         
             $cmd = ($bam_file =~ /coordSorted/) 
-                ? "samtools view -@ -@ $PROCS -bt target.fa.fai $sam_file | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - > $bam_file" # .bam ext added auto
+                ? "samtools view -@ $PROCS -bt target.fa.fai $sam_file | samtools sort -m $samtools_sort_memory -@ $PROCS2 -o - - > $bam_file" # .bam ext added auto
                 : "samtools view -@ $PROCS2 -bt target.fa.fai $sam_file > $bam_file"; # explicitly adding .bam extension
             
             
