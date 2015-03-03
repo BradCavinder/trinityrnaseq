@@ -2768,6 +2768,10 @@ sub write_trinity_partitioned_cmds {
     ##################################################
     ## write Trinity assembly commands for partitions:
     ##################################################
+    
+    if (! defined $grid_conf_file) {
+        $grid_node_max_memory = int($max_memory/$CPU) . "G";
+    }
 
     my $cmd = "$UTILDIR/support_scripts/GG_write_trinity_cmds.pl --reads_list_file $reads_list_file --CPU $grid_node_CPU --max_memory $grid_node_max_memory ";
     if ($run_as_paired_flag) {
